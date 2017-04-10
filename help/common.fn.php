@@ -48,7 +48,7 @@ if(!function_exists('U')){
 	function U($url, $query=array(), $action=''){
 		$querys = array();
 		$suffix = C('config','suffix');
-		$path = HOST.$url.$suffix;
+		$path = HOST.$url;
 		if(is_string($query)){
 			$action = $query;
 			$query = array();
@@ -66,7 +66,7 @@ if(!function_exists('U')){
 			$querys[] = $action;
 		}
 		$path .= implode('/', $querys);
-		return $path;
+		return $path.$suffix;
 	}
 }
 

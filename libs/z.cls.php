@@ -5,6 +5,13 @@
 
 		public function router(){
 			$filepath = $this->getPath();
+			$routers = $this->config('router');
+			foreach ($routers as $key => $value) {
+				if($filepath === $key){
+					$filepath = $value;
+					break;
+				}
+			}
 			$ctrl_path = ROOT_PATH.'ctrl/';
 			$file = $ctrl_path.$filepath.'.php';
 			if(!file_exists($file))	$file = $ctrl_path.$filepath.'/index.php';
@@ -37,7 +44,7 @@
 
 		protected function getPath(){
 			if(hasValue($this->filepath))	return $this->filepath;
-			$path = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : $this->config('config', 'default');
+			$path = str_replace($this->config('config', 'suffix'), '', (isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : $this->config('config', 'default')));
 			if($path[0] === '/'){
 				$path = substr($path, 1);
 			}

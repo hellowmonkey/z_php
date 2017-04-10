@@ -7,7 +7,7 @@ date_default_timezone_set("Asia/Shanghai");
 // 常量定义
 define('V', '1.0.0');
 define('ROOT_PATH', str_replace('\\','/',dirname(__FILE__)).'/');
-define('HOST', 'http://localhost/git/z_php/');
+define('HOST', 'http://localhost/github/z_php/');
 define('PUB', HOST.'public/');
 define('DEBUG', 1);
 
