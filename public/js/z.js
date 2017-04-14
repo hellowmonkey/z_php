@@ -1,8 +1,16 @@
-;(function(w, d, $){
+;(function(w, d, $){ 
 	var root_path = getZsrc()
 	var libs_path = root_path.replace('js/', '')+'libs/'
 	var isMobile = isMobile()
 	var zIndex = 99
+	var loadingHtml = '<span class="z-anim-rotate z-icon">&#xe623;</span>'
+	var menuCode = '&#xe76d;'
+	var dateNow = new Date()
+
+	var winWidth = $(w).innerWidth()
+	var winHeight = $(w).innerHeight()
+
+	var transTime = 200
 
 	var aniBoxTops = []
 
@@ -18,20 +26,17 @@
 			form: {
 				src: libs_path + 'jquery.form.min'
 			},
-			unslider: {
-				src: libs_path + 'unslider.min'
-			},
-			masonry: {
+			waterfall: {
 				src: libs_path + 'masonry-docs.min'
 			},
 			jscrollpane: {
 				src: libs_path + 'jquery.jscrollpane.min'
 			},
-			datetimepicker: {
+			datepicker: {
 				src: libs_path + 'bootstrap-datetimepicker.min'
 			},
 			lazyload: {
-				src: libs_path + 'jqquery-lazyload.min'
+				src: libs_path + 'jquery-lazyload.min'
 			}
 		},
 		title: {
@@ -48,13 +53,19 @@
 			if(!$('.z-shade').length){
 				var html = $('<div class="z-shade" style="z-index:'+z.zIndex()+';'+function(){return opacity?'opacity:'+opacity:''}()+'"></div>')
 				$('body').addClass('overflow').append(html)
-				html.fadeIn(300, next)
+				html.fadeIn(transTime, next)
 			}else{
 				next()
 			}
 			html.on('click', function(){
-				if(cb)	cb()
+				if(cb)	cb(close)
 			})
+			function close(){
+				html.fadeOut(transTime, function(){
+					html.remove()
+					$('body').removeClass('overflow')
+				})
+			}
 		},
 		resetForm: function(box){
 			var boxs = []
@@ -64,7 +75,7 @@
 				var checkboxs = $('input[type="checkbox"]')
 				if(checkboxs.length)	boxs.push(checkboxs)
 			}else{
-				if($.type(box) !== 'object' || !box.length)	box = $(box)
+				if(!box instanceof $)	box = $(box)
 				boxs.push(box)
 			}
 			if(boxs.length){
@@ -73,8 +84,10 @@
 				}
 			}
 		},
-		submit: function(ele, cb){
-			var form = $.type(ele) === 'object' ? ele : $(ele)
+		submits: function(ele, cb, tip){
+			var form = ele instanceof $ ? ele : $(ele)
+			var datatip = $.type(form.zdata('tip')) === 'undefined'
+			tip = ($.type(tip) === 'undefined' && datatip) ? '数据提交中...' : (datatip ? tip : form.zdata('tip'))
 			if(!form || !form.length || !form.attr('action'))	return false
 			if($.fn.ajaxSubmit && z.libs.form.isloaded){
 				doing()
@@ -85,11 +98,25 @@
 				})
 			}
 			function doing(){
-				form.ajaxForm();
+				if(!form.find('fieldset').length)	form.wrapInner('<fieldset></fieldset>')
+				var fieldset = form.find('fieldset')
+				if(fieldset.attr('disabled'))	return false
+				fieldset.attr('disabled', true)
+				if(bool(tip)){
+					var html = $('<div class="z-msg" style="z-index:'+z.zIndex()+'">'+tip+'</div>')
+					$('body').append(html)
+					html.css({
+						marginTop: -html.innerHeight()/2,
+						marginLeft: -html.innerWidth()/2
+					})
+				}
+				form.ajaxForm()
 				form.ajaxSubmit({
 					success: function(responseText, statusText, xhr, $form) {
 						if(statusText == "success") {
 							var ret = responseText
+							fieldset.removeAttr('disabled')
+							if(tip)	html.remove()
 							if($.type(ret) === 'string'){
 								if(w.JSON){
 									ret = JSON.parse(responseText)
@@ -100,7 +127,7 @@
 							cb(ret)
 						}
 					}
-				});
+				})
 			}
 		},
 		alert: function(content, title){
@@ -134,18 +161,74 @@
 		loadCss: function(files, cb){
 			include('css', files, cb)
 		},
+		date: function(format, time){
+			var dt = dateNow
+			var defaultFormat = 'yyyy/MM/dd H:mm'
+			var defaultTime = dt.getTime() 
+			var hasDt = false
+			if($.type(format) === 'date' || $.type(format) === 'number'){
+				time = format
+				format = defaultFormat
+			}else if($.type(format) === 'undefined'){
+				format = defaultFormat
+				time = defaultTime
+			}
+			if($.type(time) === 'undefined'){
+				time = defaultTime
+			}else if($.type(time) === 'string'){
+				time = parseInt(time)
+			}else if($.type(time) === 'date'){
+				dt = time
+				hasDt = true
+			}
+			if(!hasDt)	dt = new Date(time)
+
+			var y = dt.getFullYear(),
+			    M = dt.getMonth(),
+			    d = dt.getDate(),
+			    h = dt.getHours(),
+			    m = dt.getMinutes(),
+			    s = dt.getSeconds(),
+			    ms= dt.getMilliseconds(),
+			    z = dt.getTimezoneOffset(),
+			    wd= dt.getDay(),
+			    w = ["\u65E5","\u4E00","\u4E8C","\u4E09","\u56DB","\u4E94","\u516D"];
+			var h12 = h > 12 ? h - 12 : h
+			var o = {
+				"y+" : y,                        //年份
+				"M+" : M + 1,                        //月份
+				"d+" : d,                        //月份中的天数 
+				"H+" : h,                        //小时24H制            
+				"h+" : h12 == 0 ? 12 : h12,            //小时12H制
+				"m+" : m,                        //分钟
+				"s+" : s,                        //秒
+				"ms" : ms,                        //毫秒
+				"a+" : h > 12 || h == 0 ? "PM" : "AM",    //AM/PM 标记 
+				"w+" : wd,                        //星期 数字格式
+				"W+" : w[wd],                    //星期 中文格式
+				"q+" : Math.floor((m+3)/3),        //一月中的第几周
+				"z+" : z                        //时区
+			}
+			if (/(y+)/.test(format))
+			    format = format.replace(RegExp.$1, (dt.getFullYear() + "").substr(4- RegExp.$1.length));
+			for (var i in o)
+			if (new RegExp("(" + i + ")").test(format))
+			    format = format.replace(RegExp.$1, RegExp.$1.length == 1? o[i]: ("00" + o[i]).substr(("" + o[i]).length));
+			return format;
+		},
 		back: function(){
 			w.history.go(-1)
 		},
 		reload: function(){
 			location.reload()
 		},
-		supportCss3: supportCss3
+		supportCss3: supportCss3,
+		loadImg: loadImg
 	})
 
 	$.fn.extend({
 		tagName: function(){
-			return $(this)[0].tagName.toLowerCase()
+			return this[0].tagName.toLowerCase()
 		},
 		zdata: function(name,val){
 			if($.type(val) === 'undefined'){
@@ -174,9 +257,11 @@
 			if(_this.is(':hidden')){
 				$.createShade(function(){
 					_this.css('zIndex',z.zIndex()).show().addClass('z-anim-downbit z-anim-ms3')
+					return _this
 				})
 			}else{
-				doClose(_this, null, false)
+				doClose(_this)
+				return _this
 			}
 		},
 		tips: function(opts){
@@ -213,19 +298,19 @@
 				items: 'ul',
 				item: 'li'
 			}
-			var options = $.extend({}, inits, opts)
 			$(this).each(function(){
+				var options = getOpts($(this), inits, opts)
 				slider($(this), options)
 			})
 		},
 		waterfall: function(opts){
 			if(!$(this).length)	return
-			var container = $(this);
-			if($.fn.masonry && z.libs.masonry.isloaded){
+			var container = $(this)
+			if($.fn.masonry && z.libs.waterfall.isloaded){
 				doing()
 			}else{
-				$.loadJs(z.libs.masonry.src, function(){
-					z.libs.masonry.isloaded = true
+				$.loadJs(z.libs.waterfall.src, function(){
+					z.libs.waterfall.isloaded = true
 					doing()
 				})
 			}
@@ -237,20 +322,20 @@
 				}
 				var options = getOpts(container, inits, opts)
 		        container.css('opacity', 0).imagesLoaded(function() {
-		            container.masonry(opts);
+		            container.masonry(opts)
 	                container.css('opacity', 1)
-		        });
+		        })
 			}
 		},
 		datepicker: function(opts){
 			if(!$(this).length)	return
-			var container = $(this);
-			if($.fn.datetimepicker && z.libs.datetimepicker.isloaded){
+			var container = $(this)
+			if($.fn.datetimepicker && z.libs.datepicker.isloaded){
 				doing()
 			}else{
-				$.loadCss(z.libs.datetimepicker.src, function(){
-					$.loadJs(z.libs.datetimepicker.src, function(){
-						z.libs.masonry.isloaded = true
+				$.loadCss(z.libs.datepicker.src, function(){
+					$.loadJs(z.libs.datepicker.src, function(){
+						z.libs.datepicker.isloaded = true
 						doing()
 					})
 				})
@@ -269,7 +354,7 @@
 			if(!$(this).length)	return
 			var inits = {
 				top: 100,
-				time: 300
+				time: transTime
 			}
 			var rollBtn = $(this)
 			var options = getOpts(rollBtn, inits, opts)
@@ -294,7 +379,7 @@
 			if(!$(this).length)	return
 			$(this).each(function(){
 				var options = opts || {}
-			    var othis = $(this), html = othis.html();		      
+			    var othis = $(this), html = othis.html()		      
 			    if(othis.zdata('title'))	options.title = othis.zdata('title')
 			    if(othis.zdata('skin'))	options.skin = othis.zdata('skin')
 			    if(othis.zdata('encode'))	options.encode = othis.zdata('encode')
@@ -307,22 +392,23 @@
 
 				othis.html('<ol class="z-code-ol"><li>' + html.replace(/[\r\t\n]+/g, '</li><li>') + '</li></ol>')
 				if(!othis.find('>.z-code-h3')[0] && (options.title || options.about)){
-					othis.prepend('<h3 class="z-code-h3">'+ (options.title || 'code') + (options.about || '') + '</h3>');
+					othis.prepend('<h3 class="z-code-h3">'+ (options.title || 'code') + (options.about || '') + '</h3>')
 				}
 
-				var ol = othis.find('>.z-code-ol');
-				othis.addClass('z-code-view');
+				var ol = othis.find('>.z-code-ol')
+				othis.addClass('z-code-view')
 				if(options.skin)	othis.addClass('z-code-'+options.skin)
 
 				//按行数适配左边距
 				if((ol.find('li').length/100|0) > 0){
-					ol.css('margin-left', (ol.find('li').length/100|0) + 'px');
+					ol.css('margin-left', (ol.find('li').length/100|0) + 'px')
 				}
 
 				othis.find('li').each(function(){
 					$(this).html('<span>'+$(this).html()+'</span>')
 				})
 			})
+			return $(this)
 		},
 		aniBox: function(opts){
 			if(!$(this).length)	return
@@ -332,6 +418,21 @@
 			}
 			var options = $.extend({}, inits, opts)
 			aniBox($(this), options)
+		},
+		numberBox: function(opts){
+			if(!$(this).length)	return
+			var inits = {
+				prev: '.z-btn.sub',
+				next: '.z-btn.add',
+				input: 'input',
+				min: 1,
+				max: null,
+				step: 1
+			}
+			$(this).each(function(){
+				var options = getOpts($(this), inits, opts)
+				numberBox($(this), options)
+			})
 		},
 		swipeleft: function(cb){
 			swipe('left', $(this), cb)
@@ -349,17 +450,288 @@
 				child: '.z-dropdown-menu',
 				toggle: true,
 				class: '',
-				menu: '<span class="z-icon z-pull-right" style="line-height:1em;color:#fff;padding: 13px;font-size: 24px;">&#xe60d;</span>'
+				menu: '<span class="z-icon z-pull-right" style="line-height:1em;color:#fff;padding: 13px;font-size: 24px;">'+menuCode+'</span>'
 			}
 			var options = getOpts(nav, inits, opts)
 			mobileNav(nav, options)
+		},
+		flyOut: function(t, cb){
+			var _this = $(this)
+			var alpha = _this.css('opacity')
+			var left = 0
+			var skew = 0
+			var wid = winWidth - _this.offset().left
+			var st = 0
+			var interval = 13
+			var speed = t/interval
+			var s_alpha = alpha/speed
+			var s_left = (Math.min(wid, 100))/speed
+			var s_skew = 10/speed
+			t = t || transTime
+			var timer = setInterval(function(){
+				st = st + interval
+				alpha -= s_alpha
+				left += s_left
+				skew += s_skew
+				_this.css({
+					opacity: alpha,
+					transform: 'translate3d('+left+'px,0,0) skew('+skew+'deg, 0deg)'
+				})
+				if(st >= t){
+					clearInterval(timer)
+					cb && cb()
+				}
+			}, interval)
+		},
+		flow: function(opts, done){
+			if(!$(this).length)	return
+			if($.type(opts) === 'function'){
+				done = opts
+				opts = {}
+			}
+			var inits = {
+				scrollElem: d,
+				isAuto: true,
+				endTxt: '没有更多了',
+				eleTxt: '加载更多',
+				loadingTxt: loadingHtml + '  加载中...',
+				isLazyimg: false,
+				mb: 50,
+				done: done
+			}
+			var options = getOpts($(this), inits, opts)
+			flow($(this), options)
+		},
+		lazyimg: function(scrollEle){
+			if(!$(this).length || $(this).tagName() !== 'img')	return
+			var sEle = scrollEle || d
+			lazyimg($(this), sEle)
+		},
+		album: function(opts){
+			if(!$(this).length || $(this).tagName() !== 'img')	return
+			var inits = {
+				
+			}
+			var options = $.extend({}, inits, opts)
+			album($(this), options)
 		}
 	})
 
+	
+	function album(ele, opts){
+		ele.css('cursor', 'pointer')
+		$('body').on('click', ele.selector, function(){
+			if(!this.src || $(this).zdata('src'))	return
+			var src = $(this).zdata('bigsrc') || this.src
+			var htmls = [
+				'<div class="z-album">',
+					'<span class="z-close">&times;</span>',
+					'<div class="z-album-box">',
+					'</div>',
+					loadingHtml,
+				'</div>',
+			]
+			var html = $(htmls.join(''))
+			$.createShade(function(){
+				html.css('zIndex', z.zIndex())
+				$('body').append(html)
+				loadImg(src, function(img){
+					html.find('.z-anim-rotate').remove()
+					var width = img.width
+					var height = img.height
+					var box = html.find('.z-album-box')
+					var blank = 30
+					if(width > height){
+						box.css('height', Math.min(height, winHeight) - blank)
+						$(img).css('maxHeight', '100%')
+					}else{
+						box.css('width', Math.min(width, winWidth) - blank)
+						$(img).css('maxWidth', '100%')
+					}
+					box.show().html(img).css({
+						'marginLeft': -box.innerWidth()/2,
+						'marginTop': -box.innerHeight()/2
+					})
+				})
+			}, function(next){
+				html.fadeOut(transTime, function(){
+					html.remove()
+				})
+				next()
+			})
+			html.find('.z-close').on('click', function(){
+				$('.z-shade').click()
+			})
+		})
+	}
+	
+	function lazyimg(ele, sEle){
+		var index = 0, haveScroll;
+		var notDocment = sEle && sEle !== d
+		sEle = $(sEle)
+
+		render()
+    
+	    if(!haveScroll){
+			var timer
+			sEle.on('scroll', function(){
+				var othis = $(this)
+				if(timer) clearTimeout(timer)
+				timer = setTimeout(function(){
+				  render(null, othis)
+				}, 100)
+			}) 
+			haveScroll = true;
+	    }
+
+		function show(item, height){
+			var start = sEle.scrollTop(), end = start + height
+			var elemTop = notDocment ? function(){
+				return item.offset().top - sEle.offset().top + start
+			}() : item.offset().top
+
+			if(elemTop >= start && elemTop <= end){
+		        if(!item.attr('src')){
+					var src = item.zdata('src')
+					loadImg(src, function(){
+						var next = ele.eq(index)
+			            item.attr('src', src).removeAttr('zdata-src')
+			            
+			            next[0] && render(next)
+			            index++
+					});
+				}
+			}
+	    }
+	    function render(othis, scroll){
+			var height = notDocment ? (scroll || sEle).height() : winHeight
+			var start = sEle.scrollTop(), end = start + height
+
+			if(othis){
+				show(othis, height);
+			} else {
+				for(var i = 0; i < ele.length; i++){
+					var item = ele.eq(i), elemTop = notDocment ? function(){
+						return item.offset().top - sEle.offset().top + start;
+					}() : item.offset().top;
+
+					show(item, height);
+					index = i;
+
+					if(elemTop > end) break;
+				}
+			}
+		}
+	}
+
+	function loadImg(url, cb, error){
+    	var img = new Image()
+		img.src = url 
+			if(img.complete){
+			return cb(img)
+		}
+		img.onload = function(){
+			img.onload = null
+			cb(img)
+		}
+		img.onerror = function(e){
+			img.onerror = null
+			error && error(e)
+		} 
+    }
+	
+	function flow(ele, opts){
+		var more = $('<button type="button" class="z-btn z-block z-btn-flow">'+opts.eleTxt+'</button>')
+		var page = 1
+		var lock, isOver, lazyimg, timer;
+		var notDocment = opts.scrollElem && opts.scrollElem !== d
+		if(!ele.find('.z-btn-flow').length){
+			ele.append(more)
+		}
+		more.on('click', function(){
+			if(isOver) return;
+      		lock || done()
+		})
+	    if(opts.isLazyimg){
+	    	ele.lazyimg()
+	    }
+	    if(!opts.isAuto)	return ele
+	    $(opts.scrollElem).on('scroll', function(){
+			var _this = $(this), top = _this.scrollTop();
+
+			if(timer) clearTimeout(timer)
+			if(isOver) return ele
+
+			timer = setTimeout(function(){
+				var height = notDocment ? _this.innerHeight() : winHeight
+				var scrollHeight = notDocment ? _this.prop('scrollHeight') : d.documentElement.scrollHeight
+				if(scrollHeight - top - height <= opts.mb){
+					lock || done()
+				}
+			}, 100);
+	    });
+
+    	return ele
+
+		function next(html, over){
+			more.text(opts.eleTxt).before(html)
+			over = over == 0 ? true : null
+			if(over)	more.addClass('z-disabled').text(opts.endTxt)
+			isOver = over
+			lock = null
+			lazyimg && lazyimg()
+		}
+		function done(){
+			lock = true
+			more.html(opts.loadingTxt)
+			$.type(opts.done) === 'function' && opts.done(++page, next)
+		}
+	}
+
+	function numberBox(ele, opts){
+		var ipt = ele.find(opts.input)
+		var next = ele.find(opts.next)
+		var prev = ele.find(opts.prev)
+		var step = bool(opts.step)
+		var max = bool(opts.max)
+		var min = bool(opts.min)
+		if(!ipt || !next || !prev || !ipt.length || !next.length || !prev.length)	return
+		if(max && max < min)	return
+		ipt.off('change').on('change', function(){
+			var val = parseFloat($(this).val())
+			if(isNaN(val))	val = min
+            if(val <= min){
+                $(this).val(min)
+                prev.addClass('z-disabled')
+            }else{
+                prev.removeClass('z-disabled')
+            }
+            if(max && val >= parseFloat(max)){
+                $(this).val(max)
+                next.addClass('z-disabled')
+            }else{
+                next.removeClass('z-disabled')
+            }
+        })
+        next.off('click').on('click',function(){
+            var val = parseFloat(ipt.val())
+            if($(this).hasClass('z-disabled'))    return
+            val = val + step
+            ipt.val(val).change()
+        })
+        prev.off('click').on('click',function(){
+            var val = parseFloat(ipt.val())
+            if($(this).hasClass('z-disabled'))    return
+            val = val - step
+            ipt.val(val).change()
+        })
+        ipt.change()
+	}
+	
 	function mobileNav(nav, opts){
 		var can = true
 		var items = nav.find(opts.item)
-		var fixNav = $('<div class="z-nav z-nav-tree z-nav-mobile '+opts.class+'"></div>')
+		var fixNav = $('<ul class="z-nav z-nav-tree z-nav-mobile '+opts.class+'"></ul>')
 		var logo = ''
 		var menu = $(opts.menu)
 		items.each(function(){
@@ -380,23 +752,23 @@
 			var _this = $(this)
 			if(fixNav.is(':hidden')){
 				$.createShade(function(){
-					fixNav.css('zIndex', z.zIndex()).show().animate({'left':0},300);
-					_this.html('&times');
+					fixNav.css('zIndex', z.zIndex()).show().animate({'left':0},transTime)
+					_this.html('&times')
 					can = true
 				}, function(){
 					menu.click()
 				}, '.12')
 				nav.css('zIndex', z.zIndex())
 			}else{
-				fixNav.animate({'left':'-200px'},300,function(){
+				fixNav.animate({'left':'-200px'},transTime,function(){
 					fixNav.hide()
-					_this.html('&#xe60d;')
-					$('.z-shade').fadeOut(200, function(){
+					_this.html(menuCode)
+					$('.z-shade').fadeOut(transTime, function(){
 						$('.z-shade').remove()
 						$('body').removeClass('overflow')
 						can = true
 					})
-				});
+				})
 			}
 		})
 		$(d).swiperight(function(){
@@ -423,7 +795,7 @@
             can = true
             timer = setTimeout(function(){
             	can = false
-            },300)
+            },transTime)
         })
         ele.on('touchend',function(e){
         	e.stopPropagation()
@@ -562,6 +934,7 @@
 		var html = ''
 		var htmls = []
 		var modal_arr = ['alert', 'confirm', 'prompt', 'open']
+		var delay = 4000
 		if($.inArray(type, modal_arr) !== -1){
 			if($.type(title) === 'array'){
 				btns = title
@@ -592,8 +965,8 @@
 				var box = html.find('.z-modal-content')
 				var win = box.innerWidth()
 				var hig = box.innerHeight()
-				var ww = $(w).innerWidth()
-				var wh = $(w).innerHeight()
+				var ww = winWidth
+				var wh = winHeight
 				box.css({
 					'margin': 0,
 					'top': (wh-hig)/3>0?(wh-hig)/3:0,
@@ -615,7 +988,7 @@
 				html.hide(150, function(){
 					html.remove()
 				})
-			},4000)
+			},delay)
 		}else{
 			var color = title
 			htmls = [
@@ -627,27 +1000,28 @@
 			html = $(htmls.join(''))
 			$('body').append(html)
 			setTimeout(function(){
-				html.slideUp(150, function(){
-					html.remove()
-				})
-			},5000)
+				doClose(html)
+			},delay)
 		}
 	}
 
 
 	function doClose(box, cb, rm){
-		box.slideUp(200, function(){
-			if($('.z-shade').length){
-				$('.z-shade').fadeOut(200, fn)
-			}else{
-				fn()
-			}
-		})
-		function fn(){
-			if($.type(rm) === 'undefined')	rm = true
-			if(bool(rm))	box.remove()
-			$('.z-shade').remove()
-			$('body').removeClass('overflow')
+		var anibox = box
+		var delay = 120
+		if($.type(rm) === 'undefined')	rm = true
+		rm = bool(rm)
+		if(box.hasClass('z-modal') && rm)	anibox = box.children('.z-modal-content').length?box.children('.z-modal-content'):box
+		if(rm)	anibox.flyOut(delay, doing)
+		else 	box.slideUp(delay, doing)
+		if($('.z-shade').length && box.hasClass('z-modal')){
+			$('.z-shade').fadeOut(delay * 1.5, function(){
+				$('.z-shade').remove()
+				$('body').removeClass('overflow')
+			})
+		}
+		function doing(){
+			if(rm)	box.remove()
 			if(cb)	cb()
 		}
 	}
@@ -656,13 +1030,14 @@
 		if(type === 'loading'){
 			if(ele.hasClass('z-disabled'))	return false
 			var txt = ele.zdata('loading-text') || 'loading'
-			txt = '<span class="z-anim-rotate z-icon" style="display: inline-block; margin-right: 5px; padding:1px 0 0 0">&#xe62d;</span>' + txt
+			txt = loadingHtml + '  ' + txt
 			ele.attr('disabled', 'true').addClass('z-disabled').attr('zdata-old-text', ele.text()).html(txt)
 		}else if(type === 'reset'){
 			if(!ele.hasClass('z-disabled'))	return false
 			var txt = ele.zdata('old-text') || 'resetBtn'
 			ele.removeAttr('disabled').removeAttr('zdata-old-text').removeClass('z-disabled').html(txt)
 		}
+		return ele
 	}
 
 	function tips(ele, opts){
@@ -730,8 +1105,8 @@
 		var mleft = 0
 		var wid = 0
 		var hig = 0
-		var ww = $(w).innerWidth()
-		var wh = $(w).innerHeight()		
+		var ww = winWidth
+		var wh = winHeight
 		$(w).on('mousemove', function(e){
 			if(!isDown)	return
 			var ev = e || event
@@ -789,6 +1164,7 @@
 		var dots = null
 		var box = null
 		var mar = -width
+		var mtype = 'marginLeft'
 
 		if(bool(opts.dots)){
 			ele.append('<div class="z-dots">'+function(){
@@ -820,7 +1196,7 @@
 			leg = item.length
 			items.wrap('<div></div>')
 			box = items.parent()
-			box.css('marginLeft', mar)
+			box.css(mtype, mar)
 		}else	return
 
 		item.width(width)
@@ -840,7 +1216,7 @@
 		　　　　e.preventDefault()
 				move = touch.clientX - sx
 		        touch = e.originalEvent.changedTouches[0]
-		        box.css('marginLeft', mar + move)
+		        box.css(mtype, mar + move)
 			})
 
 			ele.on('touchstart',function(e){
@@ -884,13 +1260,13 @@
 			if(direction === 'left'){
 				if(Math.abs(mar) >= (leg-2)*width){
 					mar = 0
-					box.css({'marginLeft': mar})
+					box.css(mtype, mar)
 				}
 				mar = mar - width
 			}else if(direction === 'right'){
 				if(Math.abs(mar) <= width){
 					mar = -(leg-1)*width
-					box.css({'marginLeft': mar})
+					box.css(mtype, mar)
 				}
 				mar = mar + width
 			}else{
@@ -912,19 +1288,19 @@
 		htmlStyle = d.documentElement.style, 
 		_toHumb = function (string) { 
 			return string.replace(/-(\w)/g, function ($0, $1) {
-				return $1.toUpperCase(); 
-			}); 
-		}; 
+				return $1.toUpperCase() 
+			}) 
+		} 
 		 
 		for (i in prefix) 
-			humpString.push(_toHumb(prefix[i] + '-' + style)); 
+			humpString.push(_toHumb(prefix[i] + '-' + style)) 
 		 
-		humpString.push(_toHumb(style)); 
+		humpString.push(_toHumb(style)) 
 		 
 		for (i in humpString) 
-			if (humpString[i] in htmlStyle) return true; 
+			if (humpString[i] in htmlStyle) return true 
 		 
-		return false; 
+		return false 
 	}
 
 	function aniBox(ele, opts){
@@ -941,7 +1317,7 @@
 			}
 		})
 		var maxHig = Math.max.apply({}, aniBoxTops)
-		maxHig = Math.min(maxHig, ($(d).innerHeight() - $(w).innerHeight()))
+		maxHig = Math.min(maxHig, ($(d).innerHeight() - winHeight))
 
 		doing()
 		$(w).on('scroll', doing)
@@ -952,7 +1328,7 @@
 				var queue = []
 				ele.each(function(){
 					var _this = $(this)
-					if(_this.zdata('aniName') && parseInt(_this.zdata('top')) <= (dtop+$(w).height())){
+					if(_this.zdata('aniName') && parseInt(_this.zdata('top')) <= (dtop + winHeight)){
 						queue.push(_this)
 					}
 				})
@@ -964,11 +1340,12 @@
 							return
 						}
 						var item = queue[i]
-						item.addClass(item.zdata('aniName')).addClass('z-anim-ms'+parseInt(item.zdata('aniTime'))/100).removeAttr('zdata-top').removeAttr('zdata-aniName').removeAttr('zdata-aniTime').animate({'opacity': 1}, 300)
+						item.addClass(item.zdata('aniName')).addClass('z-anim-ms'+parseInt(item.zdata('aniTime'))/100).removeAttr('zdata-top').removeAttr('zdata-aniName').removeAttr('zdata-aniTime').animate({'opacity': 1}, transTime)
 						++i
 					}, 100)					
 				}
 			}else{
+				ele.css('opacity', 1)
 				isEnd = true
 			}
 		}
@@ -980,7 +1357,7 @@
 		
 		$.each(options, function(key, val) {
 			if($.type(ele.zdata(key)) !== 'undefined')	options[key] = ele.zdata(key)
-		});
+		})
 		return options
 	}
 
@@ -997,12 +1374,12 @@
 	function isMobile(){
 		return navigator.userAgent.match(/mobile/i)
 	}
-
+ 
 
 	$(function(){
 
 		// 代码修饰器
-		$('.z-action-code').code();
+		$('.z-action-code').code()
 
 		// 日期选择器
 		$('.z-action-datepicker').datepicker()
@@ -1026,6 +1403,15 @@
 		
 		// 动态进入
 		$('.z-action-anibox').aniBox()
+
+		// 图片懒加载
+		$('.z-action-lazyimg').lazyimg()
+
+		// 图片相册
+		$('.z-action-album').album()
+
+		// 数字输入框
+		$('.z-action-numberbox').numberBox()
 		
 		// 替换单选框和复选框
 		$.resetForm()
@@ -1087,7 +1473,7 @@
 				_this.removeClass('z-active')
 			}else{
 				var pnav = _this.parents('.z-nav-tree')
-				if(pnav.hasClass('z-nav-toggle')){
+				if(pnav.hasClass('z-nav-toggle') || !_this.children('.z-nav-child').length){
 					pnav.find('.z-nav-item').removeClass('z-active')
 				}
 				_this.addClass('z-active')

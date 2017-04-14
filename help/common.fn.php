@@ -54,7 +54,7 @@ if(!function_exists('U')){
 			$query = array();
 		}
 		if(hasValue($query) || hasValue($action)){
-			$path .= '&';
+			$path .= '/';
 		}
 		if(count($query)){
 			foreach ($query as $key => $value) {
